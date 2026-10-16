@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#000000" />
+  <title>WatchWave — Spatial UI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://www.youtube.com/iframe_api"></script>
+</head>
+<body>
+
+  <!-- Abstract Animated Background -->
+  <div class="spatial-bg">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="noise-overlay"></div>
+  </div>
+
+  <!-- Pre-Flight Lobby Wrapper -->
+  <div id="lobby" class="lobby-wrapper">
+    <div class="glass-panel lobby-panel">
+      <div class="logo-mark">W<span>W</span></div>
+      <h1>Enter WatchWave</h1>
+      <p>Your immersive screening experience awaits.</p>
+      
+      <div class="lobby-inputs">
+        <input type="text" id="lobby-name" placeholder="Your Alias" autocomplete="off" maxlength="20" />
+        <input type="text" id="lobby-room" placeholder="Room Code (Leave blank to create)" autocomplete="off" maxlength="8" />
+        <button id="join-btn" class="glass-btn primary-glow">Initialize Connection</button>
+        <p id="lobbyError" class="error-text"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Application Wrapper -->
+  <main id="party" class="party-view hidden">
+    
+    <!-- Top Floating Header -->
+    <header class="glass-header">
+      <div class="header-brand">
+        <div class="logo-mini">W</div>
+        <span class="brand-text">WATCHWAVE</span>
+        <span class="live-indicator"><i class="dot"></i> LIVE</span>
+      </div>
+      <div class="header-center">
+        <span id="topRoomName">ROOM ---</span>
+        <span class="divider">|</span>
+        <span id="currentTitle" class="now-playing-title">Waiting for host...</span>
+      </div>
+      <div class="header-actions">
+        <button id="copyInvite" class="glass-btn small">Share Invite</button>
+        <button id="leaveRoom" class="glass-btn small danger">Disconnect</button>
+        <div class="avatar-ring"><div id="myAvatar" class="avatar">G</div></div>
+      </div>
+    </header>
+
+    <!-- Spatial Grid Layout -->
+    <div class="spatial-grid">
+      
+      <!-- LEFT WING: Library & Queue -->
+      <aside class="wing-panel left-wing glass-panel">
+        <div class="wing-section discover-section">
+          <div class="section-head">
+            <h3>Discover</h3>
+            <span class="icon">🔍</span>
+          </div>
+          <div class="search-wrap">
+            <input id="movieSearch" type="search" placeholder="Search the catalog..." />
+          </div>
+          <div id="genreFilters" class="pill-row">
+            <button class="genre-chip active" data-genre="All">All</button>
+            <button class="genre-chip" data-genre="Sci-Fi">Sci-Fi</button>
+            <button class="genre-chip" data-genre="Drama">Drama</button>
+            <button class="genre-chip" data-genre="Animation">Animation</button>
+          </div>
+          <div id="movieResults" class="scroll-area movie-list"></div>
+        </div>
+
+        <div class="wing-section queue-section">
+          <div class="section-head">
+            <h3>Up Next <span id="queueCount" class="badge">0</span></h3>
+            <button id="addCustomMovie" class="icon-btn" title="Add Custom URL">+</button>
+          </div>
+          <div id="playlist" class="scroll-area playlist-area"></div>
+        </div>
+      </aside>
+
+      <!-- CENTER STAGE: Theater & Controls -->
+      <section class="center-stage">
+        
+        <div class="theater-screen glass-panel">
+          <div id="ytPlayer" class="video-layer"></div>
+          <div id="playerFallback" class="fallback-layer">
+            <div class="pulse-ring"></div>
+            <h2>Ready to Stream</h2>
+            <p>Waiting for the host to pick a movie.</p>
+          </div>
+          <div id="reactionFloats" class="reaction-layer"></div>
+          
+          <!-- Media Meta Overlay -->
+          <div class="video-meta-overlay">
+            <div class="meta-pill"><i class="dot"></i> <span id="watchingCount">1</span> Viewer(s)</div>
+            <div class="meta-pill"><span id="latency">--</span>ms Ping</div>
+            <div class="meta-pill" style="display:none;"><span id="currentSubtitle"></span></div>
+            <div class="meta-pill" style="display:none;"><span id="mediaState"></span><span id="syncStatus"></span></div>
+          </div>
+        </div>
+
+        <!-- Dynamic Dock Controls -->
+        <div class="dynamic-dock glass-panel">
+          <div class="dock-left">
+            <button id="resync" class="dock-btn secondary">↻ Resync</button>
+            <span id="driftMeter" class="dock-status">DRIFT --</span>
+          </div>
+          <div class="dock-center">
+            <button id="playPause" class="dock-btn primary giant-btn" disabled>▶ Play</button>
+          </div>
+          <div class="dock-right">
+            <span id="hostNote" class="dock-status">Host holds remote</span>
+            <button id="startPoll" class="dock-btn secondary">📊 Poll</button>
+            <button id="createPollInline" style="display:none;">Poll</button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- RIGHT WING: Social & Interactive -->
+      <aside class="wing-panel right-wing glass-panel">
+        <div class="wing-tabs">
+          <button class="social-tab active" data-tab="chat">Comms <span id="chatCount" class="badge">0</span></button>
+          <button class="social-tab" data-tab="people">Crew <span id="peopleCount" class="badge">1</span></button>
+        </div>
+
+        <!-- Chat View -->
+        <div id="chatTab" class="tab-content active-content">
+          <div id="chatMessages" class="scroll-area chat-feed"></div>
+          <div class="chat-input-zone">
+            <form id="chatForm">
+              <input id="chatInput" placeholder="Message the crew..." autocomplete="off" />
+              <button type="submit" class="send-btn">↑</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- People View -->
+        <div id="peopleTab" class="tab-content hidden">
+          <div class="crew-header">
+            <span>Roster <span id="peopleSubhead" class="status-footer"></span></span>
+            <button id="peopleInvite" class="glass-btn tiny">Invite</button>
+          </div>
+          <div id="participants" class="scroll-area crew-list"></div>
+        </div>
+
+        <!-- Bottom Vibe & Poll Drawer -->
+        <div class="interactive-drawer">
+          <div id="pollPanel" class="poll-mini-panel">
+            <div id="pollContent"></div>
+          </div>
+          <div class="vibe-bar">
+            <button data-emoji="😂">😂</button>
+            <button data-emoji="🔥">🔥</button>
+            <button data-emoji="🤯">🤯</button>
+            <button data-emoji="🍿">🍿</button>
+            <button data-emoji="❤️">❤️</button>
+          </div>
+          <div class="status-footer">
+            <span id="lastReaction">No reactions yet</span>
+            <span id="onlineLabel">● ONLINE</span>
+          </div>
+        </div>
+
+      </aside>
+
+    </div>
+  </main>
+
+  <!-- Dialogs & Toasts -->
+  <div id="toast" class="glass-toast"></div>
+  
+  <dialog id="customMovieDialog" class="glass-dialog">
+    <form id="customMovieForm" method="dialog">
+      <h3>Add Custom URL</h3>
+      <input id="customTitle" placeholder="Video Title" required />
+      <input id="customYoutube" placeholder="YouTube URL or ID" required />
+      <div class="dialog-actions">
+        <button type="button" id="cancelCustom" class="glass-btn secondary">Cancel</button>
+        <button type="submit" class="glass-btn primary">Queue Video</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="pollDialog" class="glass-dialog">
+    <form id="pollForm" method="dialog">
+      <h3>Launch a Poll</h3>
+      <input id="pollQuestion" placeholder="Question?" required value="What should we watch next?" />
+      <div class="poll-options-grid">
+        <input class="poll-option-input" placeholder="Option 1" value="Next Trailer" required />
+        <input class="poll-option-input" placeholder="Option 2" value="Start Movie" required />
+        <input class="poll-option-input" placeholder="Option 3" />
+        <input class="poll-option-input" placeholder="Option 4" />
+      </div>
+      <div class="dialog-actions">
+        <button type="button" id="cancelPoll" class="glass-btn secondary">Cancel</button>
+        <button type="submit" class="glass-btn primary">Launch</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/app.js"></script>
+</body>
+</html>
